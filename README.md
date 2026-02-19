@@ -44,29 +44,33 @@
   <p>You can copy the code directly from this box without having to search for the file in the repository:</p>
   
   <pre style="background-color: #282c34; color: #abb2bf; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', Courier, monospace;"><code>// ==UserScript==
-// @name         Colonist.io Drawing Tablet Fix
+// ==UserScript==
+// @name         Colonist.io Drawing Tablet Fix v2
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Fixes drawing tablet (pen) input on Colonist.io by translating pointer events to mouse events.
+// @version      2.0
+// @description  Spoofs pen pointer events as mouse pointer events to fix tablet input on Colonist.io.
 // @author       R0mb0
 // @match        *://colonist.io/*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=colonist.io
 // @grant        none
 // ==/UserScript==
 
 (function() {
     'use strict';
 
-    function translateEvent(event) {
-        if (event.pointerType !== 'pen') return;
+    function spoofPenAsMouse(event) {
+        // Intervene ONLY if the input is from a pen and is a legitimate, physical event (isTrusted).
+        // Bypassing this check would result in an infinite loop caused by our own dispatched synthetic events.
+        if (event.pointerType === 'pen' && event.isTrusted) {
+            
+            // 1. Immediately halt the original pen event. 
+            // This prevents the browser from translating it into a 'touchstart' event and stops the PixiJS engine from processing the native pen input.
+            event.stopImmediatePropagation();
+            if (event.type !== 'pointermove') {
+                event.preventDefault(); // Prevent unexpected native browser behaviors (e.g., scrolling, panning)
+            }
 
-        let mouseEventType = '';
-        if (event.type === 'pointerdown') mouseEventType = 'mousedown';
-        if (event.type === 'pointerup') mouseEventType = 'mouseup';
-        if (event.type === 'pointermove') mouseEventType = 'mousemove';
-
-        if (mouseEventType) {
-            const simulatedEvent = new MouseEvent(mouseEventType, {
+            // 2. Construct a synthetic PointerEvent identical to the original, but spoofed as a mouse.
+            const simulatedEvent = new PointerEvent(event.type, {
                 bubbles: true,
                 cancelable: true,
                 view: window,
@@ -74,17 +78,25 @@
                 clientY: event.clientY,
                 screenX: event.screenX,
                 screenY: event.screenY,
-                button: event.button,
-                buttons: event.buttons
+                movementX: event.movementX,
+                movementY: event.movementY,
+                // Ensure mouse buttons are simulated correctly (left click mapping)
+                button: event.type === 'pointermove' ? -1 : 0,
+                buttons: event.type === 'pointerdown' ? 1 : (event.type === 'pointermove' && event.buttons ? 1 : 0),
+                pointerId: 1, // Standard pointerId for the primary mouse
+                pointerType: 'mouse', 
+                isPrimary: true
             });
 
+            // 3. Dispatch the synthetic event to the original target (the game canvas).
             event.target.dispatchEvent(simulatedEvent);
         }
     }
 
-    document.addEventListener('pointerdown', translateEvent, true);
-    document.addEventListener('pointerup', translateEvent, true);
-    // document.addEventListener('pointermove', translateEvent, true); // Uncomment if drag&drop isn't working
+    // Use the capture phase (true) to intercept events BEFORE the game's event listeners can process them.
+    document.addEventListener('pointerdown', spoofPenAsMouse, true);
+    document.addEventListener('pointerup', spoofPenAsMouse, true);
+    document.addEventListener('pointermove', spoofPenAsMouse, true); 
 })();</code></pre>
 
   <h2>🛠️ Installation Instructions</h2>
