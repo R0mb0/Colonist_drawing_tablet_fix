@@ -119,6 +119,12 @@
       <li>Refresh your Colonist.io page and enjoy playing with your tablet!</li>
   </ol>
 
+  <h2>🤝 Contributing</h2>
+  <p>
+      Feel free to open an issue or submit a pull request if you notice bugs, especially regarding drag-and-drop actions 
+      which might require further event mapping.
+  </p>
+
 </body>
 </html>
 
